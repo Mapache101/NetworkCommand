@@ -1,348 +1,376 @@
-import React, { useState, useEffect, useRef } from 'react';
-
-const NetworkSimulator = () => {
-  // Application State
-  const [history, setHistory] = useState([
-    { text: "ICT CS O Level - Unit 3.4 Network Hardware Simulator", type: "system" },
-    { text: "Loading virtual network interface...", type: "system" },
-    { text: "Type 'help' to see available commands.", type: "info" }
-  ]);
-  const [inputCommand, setInputCommand] = useState("");
-  const [mode, setMode] = useState("PC"); // 'PC' or 'ROUTER'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Network Hardware Simulator</title>
   
-  // Track student progress on objectives
-  const [objectives, setObjectives] = useState({
-    ipconfig: false,
-    ping: false,
-    nslookup: false,
-    router: false
-  });
+  <!-- Load Tailwind CSS for styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Load React and ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Load Babel to compile JSX in the browser -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
 
-  const terminalEndRef = useRef(null);
+  <!-- React Application Logic -->
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
 
-  const dnsRecords = {
-    "www.scis-bo.com": "200.105.215.10",
-    "www.google.com": "142.250.190.46",
-    "router.local": "192.168.1.1"
-  };
-
-  // Generate unique MAC and IP upon component mount
-  const [pcConfig] = useState(() => {
-    const generateHex = () => Math.floor(Math.random() * 256).toString(16).toUpperCase().padStart(2, '0');
-    // Random IP ending between 100 and 200 to match the DHCP pool
-    const randomIP = Math.floor(Math.random() * 101) + 100; 
-    
-    return {
-      mac: `00-1C-B3-${generateHex()}-${generateHex()}-${generateHex()}`, // Uses Apple OUI base + random
-      ipv4: `192.168.1.${randomIP}`,
-      ipv6: "a8fb:7a88:fff0:0fff:3d21:2085:66fb:f0fa",
-      gateway: "192.168.1.1",
-      dns: "192.168.1.1"
-    };
-  });
-
-  const routerConfig = {
-    mac: "00-40-96-A1-B2-C3", // Example Cisco MAC from text
-    lan_ip: "192.168.1.1",
-    wan_ip: "198.31.200.16",
-    dhcp_status: "Enabled",
-    firewall: "Active"
-  };
-
-  // Auto-scroll terminal to bottom when history updates
-  useEffect(() => {
-    terminalEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [history]);
-
-  const handleCommandSubmit = (e) => {
-    e.preventDefault();
-    if (!inputCommand.trim()) return;
-
-    const cmd = inputCommand.trim();
-    const newHistory = [...history, { text: `${mode === "PC" ? "C:\\PC>" : "Router#"} ${cmd}`, type: "input" }];
-    
-    setHistory(newHistory);
-    setInputCommand("");
-    processCommand(cmd, newHistory);
-  };
-
-  const processCommand = (cmd, currentHistory) => {
-    const args = cmd.toLowerCase().split(" ").filter(Boolean);
-    const command = args[0];
-    let output = [];
-
-    if (mode === "PC") {
-      switch (command) {
-        case "help":
-          output = [
-            { text: "Available Commands (PC Mode):", type: "info" },
-            { text: "  help       - Show this message", type: "system" },
-            { text: "  clear      - Clear the terminal screen", type: "system" },
-            { text: "  ipconfig   - Display network configuration (IP, MAC, Gateway)", type: "system" },
-            { text: "  ping       - Send ICMP echo requests to a network host (e.g., ping www.google.com)", type: "system" },
-            { text: "  nslookup   - Look up the IP address of a domain name", type: "system" },
-            { text: "  connect    - Connect to a remote device (e.g., connect router)", type: "system" }
-          ];
-          break;
-        case "clear":
-          setHistory([]);
-          return;
-        case "ipconfig":
-          output = [
-            { text: "Windows IP Configuration", type: "system" },
-            { text: " ", type: "system" },
-            { text: "Ethernet adapter Local Area Connection:", type: "system" },
-            { text: `   Media Access Control (MAC) . : ${pcConfig.mac}`, type: "success" },
-            { text: `   IPv4 Address. . . . . . . .  : ${pcConfig.ipv4} (Dynamic/DHCP)`, type: "success" },
-            { text: `   IPv6 Address. . . . . . . .  : ${pcConfig.ipv6}`, type: "system" },
-            { text: "   Subnet Mask . . . . . . . .  : 255.255.255.0", type: "system" },
-            { text: `   Default Gateway . . . . . .  : ${pcConfig.gateway}`, type: "system" }
-          ];
-          setObjectives(prev => ({ ...prev, ipconfig: true }));
-          break;
-        case "ping":
-          if (args.length < 2) {
-            output = [{ text: "Usage: ping <target>", type: "error" }];
-          } else {
-            const target = args[1];
-            const ip = dnsRecords[target] || (target.match(/^[0-9.]+$/) ? target : null);
-            
-            if (ip) {
-              output = [
-                { text: `Pinging ${target} [${ip}] with 32 bytes of data:`, type: "system" },
-                { text: `Reply from ${ip}: bytes=32 time=14ms TTL=54`, type: "success" },
-                { text: `Reply from ${ip}: bytes=32 time=15ms TTL=54`, type: "success" },
-                { text: `Reply from ${ip}: bytes=32 time=13ms TTL=54`, type: "success" },
-                { text: `Reply from ${ip}: bytes=32 time=14ms TTL=54`, type: "success" },
-                { text: `Ping statistics for ${ip}:`, type: "info" },
-                { text: `    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss)`, type: "info" }
-              ];
-              setObjectives(prev => ({ ...prev, ping: true }));
-            } else {
-              output = [{ text: `Ping request could not find host ${target}. Please check the name and try again.`, type: "error" }];
-            }
-          }
-          break;
-        case "nslookup":
-          if (args.length < 2) {
-            output = [{ text: "Usage: nslookup <domain>", type: "error" }];
-          } else {
-            const domain = args[1];
-            const ip = dnsRecords[domain];
-            output = [
-              { text: `Server:  Local Router`, type: "system" },
-              { text: `Address:  ${pcConfig.dns}`, type: "system" },
-              { text: " ", type: "system" }
-            ];
-            if (ip) {
-              output.push({ text: "Non-authoritative answer:", type: "info" });
-              output.push({ text: `Name:    ${domain}`, type: "success" });
-              output.push({ text: `Address:  ${ip}`, type: "success" });
-              setObjectives(prev => ({ ...prev, nslookup: true }));
-            } else {
-              output.push({ text: `*** Local Router can't find ${domain}: Non-existent domain`, type: "error" });
-            }
-          }
-          break;
-        case "connect":
-          if (args[1] === "router") {
-            setMode("ROUTER");
-            output = [
-              { text: "Connecting to 192.168.1.1...", type: "system" },
-              { text: "Authentication successful.", type: "success" },
-              { text: "Welcome to the Network Router Configuration Utility.", type: "info" },
-              { text: "Type 'help' for router commands.", type: "system" }
-            ];
-            setObjectives(prev => ({ ...prev, router: true }));
-          } else {
-            output = [{ text: `Cannot connect to ${args[1] || 'undefined'}. Target unknown.`, type: "error" }];
-          }
-          break;
-        default:
-          output = [{ text: `'${command}' is not recognized as an internal or external command.`, type: "error" }];
-      }
-    } else if (mode === "ROUTER") {
-      switch (command) {
-        case "help":
-          output = [
-            { text: "Router Commands:", type: "info" },
-            { text: "  help       - Show this message", type: "system" },
-            { text: "  clear      - Clear the terminal screen", type: "system" },
-            { text: "  show int   - Show interface configurations (LAN/WAN)", type: "system" },
-            { text: "  show dhcp  - Show DHCP server status", type: "system" },
-            { text: "  exit       - Disconnect from router", type: "system" }
-          ];
-          break;
-        case "clear":
-          setHistory([]);
-          return;
-        case "show":
-          if (args[1] === "int" || args[1] === "interfaces") {
-            output = [
-              { text: "Local Area Network (LAN) Interface:", type: "info" },
-              { text: `  MAC Address : ${routerConfig.mac}`, type: "system" },
-              { text: `  IP Address  : ${routerConfig.lan_ip}`, type: "success" },
-              { text: "Wide Area Network (WAN) Interface:", type: "info" },
-              { text: `  Public IP   : ${routerConfig.wan_ip} (Static)`, type: "success" },
-              { text: "  Status      : CONNECTED TO ISP", type: "success" }
-            ];
-          } else if (args[1] === "dhcp") {
-            output = [
-              { text: "DHCP Server Status:", type: "info" },
-              { text: `  State       : ${routerConfig.dhcp_status}`, type: "system" },
-              { text: "  IP Pool     : 192.168.1.100 - 192.168.1.200", type: "system" },
-              { text: `  Leased IPs  : 1 (${pcConfig.mac} -> ${pcConfig.ipv4})`, type: "success" }
-            ];
-          } else {
-            output = [{ text: "Usage: show [int | dhcp]", type: "error" }];
-          }
-          break;
-        case "exit":
-          setMode("PC");
-          output = [{ text: "Connection closed. Returning to PC.", type: "info" }];
-          break;
-        default:
-          output = [{ text: `Invalid command. Type 'help' for options.`, type: "error" }];
-      }
-    }
-
-    setHistory([...currentHistory, ...output]);
-  };
-
-  return (
-    <div className="flex flex-col md:flex-row h-screen bg-slate-100 text-slate-800 font-sans">
+    const NetworkSimulator = () => {
+      // Application State
+      const [history, setHistory] = useState([
+        { text: "ICT CS O Level - Unit 3.4 Network Hardware Simulator", type: "system" },
+        { text: "Loading virtual network interface...", type: "system" },
+        { text: "Type 'help' to see available commands.", type: "info" }
+      ]);
+      const [inputCommand, setInputCommand] = useState("");
+      const [mode, setMode] = useState("PC"); // 'PC' or 'ROUTER'
       
-      {/* LEFT PANEL: Educational Content & Objectives */}
-      <div className="w-full md:w-1/3 bg-white border-r border-slate-300 flex flex-col h-full overflow-y-auto shadow-lg z-10">
-        <div className="p-6 bg-blue-600 text-white shadow-md">
-          <h1 className="text-2xl font-bold tracking-tight">ICT CS O Level</h1>
-          <h2 className="text-sm font-medium text-blue-200 mt-1 uppercase tracking-wider">Unit 3.4 Network Hardware</h2>
-        </div>
+      // Track student progress on objectives
+      const [objectives, setObjectives] = useState({
+        ipconfig: false,
+        ping: false,
+        nslookup: false,
+        router: false
+      });
 
-        <div className="p-6 flex-grow">
-          <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-             <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9.5a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path></svg>
-             Your Mission Objectives
-          </h3>
-          <div className="bg-slate-50 rounded-lg p-4 mb-6 border border-slate-200 shadow-inner">
-            <ul className="space-y-3">
-              <ObjectiveItem done={objectives.ipconfig} text="Check your PC's IP and MAC using ipconfig" />
-              <ObjectiveItem done={objectives.ping} text="Ping a website to check connectivity" />
-              <ObjectiveItem done={objectives.nslookup} text="Use nslookup to find a website's IP address (e.g., www.scis-bo.com)" />
-              <ObjectiveItem done={objectives.router} text="Connect to the router (connect router)" />
-            </ul>
-          </div>
+      const terminalEndRef = useRef(null);
 
-          <h3 className="text-xl font-bold text-slate-800 mb-4 border-b pb-2">Reference Guide</h3>
+      const dnsRecords = {
+        "www.scis-bo.com": "200.105.215.10",
+        "www.google.com": "142.250.190.46",
+        "router.local": "192.168.1.1"
+      };
+
+      // Generate unique MAC and IP upon component mount
+      const [pcConfig] = useState(() => {
+        const generateHex = () => Math.floor(Math.random() * 256).toString(16).toUpperCase().padStart(2, '0');
+        // Random IP ending between 100 and 200 to match the DHCP pool
+        const randomIP = Math.floor(Math.random() * 101) + 100; 
+        
+        return {
+          mac: `00-1C-B3-${generateHex()}-${generateHex()}-${generateHex()}`, // Uses Apple OUI base + random
+          ipv4: `192.168.1.${randomIP}`,
+          ipv6: "a8fb:7a88:fff0:0fff:3d21:2085:66fb:f0fa",
+          gateway: "192.168.1.1",
+          dns: "192.168.1.1"
+        };
+      });
+
+      const routerConfig = {
+        mac: "00-40-96-A1-B2-C3", // Example Cisco MAC from text
+        lan_ip: "192.168.1.1",
+        wan_ip: "198.31.200.16",
+        dhcp_status: "Enabled",
+        firewall: "Active"
+      };
+
+      // Auto-scroll terminal to bottom when history updates
+      useEffect(() => {
+        terminalEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, [history]);
+
+      const handleCommandSubmit = (e) => {
+        e.preventDefault();
+        if (!inputCommand.trim()) return;
+
+        const cmd = inputCommand.trim();
+        const newHistory = [...history, { text: `${mode === "PC" ? "C:\\PC>" : "Router#"} ${cmd}`, type: "input" }];
+        
+        setHistory(newHistory);
+        setInputCommand("");
+        processCommand(cmd, newHistory);
+      };
+
+      const processCommand = (cmd, currentHistory) => {
+        const args = cmd.toLowerCase().split(" ").filter(Boolean);
+        const command = args[0];
+        let output = [];
+
+        if (mode === "PC") {
+          switch (command) {
+            case "help":
+              output = [
+                { text: "Available Commands (PC Mode):", type: "info" },
+                { text: "  help       - Show this message", type: "system" },
+                { text: "  clear      - Clear the terminal screen", type: "system" },
+                { text: "  ipconfig   - Display network configuration (IP, MAC, Gateway)", type: "system" },
+                { text: "  ping       - Send ICMP echo requests to a network host (e.g., ping www.google.com)", type: "system" },
+                { text: "  nslookup   - Look up the IP address of a domain name", type: "system" },
+                { text: "  connect    - Connect to a remote device (e.g., connect router)", type: "system" }
+              ];
+              break;
+            case "clear":
+              setHistory([]);
+              return;
+            case "ipconfig":
+              output = [
+                { text: "Windows IP Configuration", type: "system" },
+                { text: " ", type: "system" },
+                { text: "Ethernet adapter Local Area Connection:", type: "system" },
+                { text: `   Media Access Control (MAC) . : ${pcConfig.mac}`, type: "success" },
+                { text: `   IPv4 Address. . . . . . . .  : ${pcConfig.ipv4} (Dynamic/DHCP)`, type: "success" },
+                { text: `   IPv6 Address. . . . . . . .  : ${pcConfig.ipv6}`, type: "system" },
+                { text: "   Subnet Mask . . . . . . . .  : 255.255.255.0", type: "system" },
+                { text: `   Default Gateway . . . . . .  : ${pcConfig.gateway}`, type: "system" }
+              ];
+              setObjectives(prev => ({ ...prev, ipconfig: true }));
+              break;
+            case "ping":
+              if (args.length < 2) {
+                output = [{ text: "Usage: ping <target>", type: "error" }];
+              } else {
+                const target = args[1];
+                const ip = dnsRecords[target] || (target.match(/^[0-9.]+$/) ? target : null);
+                
+                if (ip) {
+                  output = [
+                    { text: `Pinging ${target} [${ip}] with 32 bytes of data:`, type: "system" },
+                    { text: `Reply from ${ip}: bytes=32 time=14ms TTL=54`, type: "success" },
+                    { text: `Reply from ${ip}: bytes=32 time=15ms TTL=54`, type: "success" },
+                    { text: `Reply from ${ip}: bytes=32 time=13ms TTL=54`, type: "success" },
+                    { text: `Reply from ${ip}: bytes=32 time=14ms TTL=54`, type: "success" },
+                    { text: `Ping statistics for ${ip}:`, type: "info" },
+                    { text: `    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss)`, type: "info" }
+                  ];
+                  setObjectives(prev => ({ ...prev, ping: true }));
+                } else {
+                  output = [{ text: `Ping request could not find host ${target}. Please check the name and try again.`, type: "error" }];
+                }
+              }
+              break;
+            case "nslookup":
+              if (args.length < 2) {
+                output = [{ text: "Usage: nslookup <domain>", type: "error" }];
+              } else {
+                const domain = args[1];
+                const ip = dnsRecords[domain];
+                output = [
+                  { text: `Server:  Local Router`, type: "system" },
+                  { text: `Address:  ${pcConfig.dns}`, type: "system" },
+                  { text: " ", type: "system" }
+                ];
+                if (ip) {
+                  output.push({ text: "Non-authoritative answer:", type: "info" });
+                  output.push({ text: `Name:    ${domain}`, type: "success" });
+                  output.push({ text: `Address:  ${ip}`, type: "success" });
+                  setObjectives(prev => ({ ...prev, nslookup: true }));
+                } else {
+                  output.push({ text: `*** Local Router can't find ${domain}: Non-existent domain`, type: "error" });
+                }
+              }
+              break;
+            case "connect":
+              if (args[1] === "router") {
+                setMode("ROUTER");
+                output = [
+                  { text: "Connecting to 192.168.1.1...", type: "system" },
+                  { text: "Authentication successful.", type: "success" },
+                  { text: "Welcome to the Network Router Configuration Utility.", type: "info" },
+                  { text: "Type 'help' for router commands.", type: "system" }
+                ];
+                setObjectives(prev => ({ ...prev, router: true }));
+              } else {
+                output = [{ text: `Cannot connect to ${args[1] || 'undefined'}. Target unknown.`, type: "error" }];
+              }
+              break;
+            default:
+              output = [{ text: `'${command}' is not recognized as an internal or external command.`, type: "error" }];
+          }
+        } else if (mode === "ROUTER") {
+          switch (command) {
+            case "help":
+              output = [
+                { text: "Router Commands:", type: "info" },
+                { text: "  help       - Show this message", type: "system" },
+                { text: "  clear      - Clear the terminal screen", type: "system" },
+                { text: "  show int   - Show interface configurations (LAN/WAN)", type: "system" },
+                { text: "  show dhcp  - Show DHCP server status", type: "system" },
+                { text: "  exit       - Disconnect from router", type: "system" }
+              ];
+              break;
+            case "clear":
+              setHistory([]);
+              return;
+            case "show":
+              if (args[1] === "int" || args[1] === "interfaces") {
+                output = [
+                  { text: "Local Area Network (LAN) Interface:", type: "info" },
+                  { text: `  MAC Address : ${routerConfig.mac}`, type: "system" },
+                  { text: `  IP Address  : ${routerConfig.lan_ip}`, type: "success" },
+                  { text: "Wide Area Network (WAN) Interface:", type: "info" },
+                  { text: `  Public IP   : ${routerConfig.wan_ip} (Static)`, type: "success" },
+                  { text: "  Status      : CONNECTED TO ISP", type: "success" }
+                ];
+              } else if (args[1] === "dhcp") {
+                output = [
+                  { text: "DHCP Server Status:", type: "info" },
+                  { text: `  State       : ${routerConfig.dhcp_status}`, type: "system" },
+                  { text: "  IP Pool     : 192.168.1.100 - 192.168.1.200", type: "system" },
+                  { text: `  Leased IPs  : 1 (${pcConfig.mac} -> ${pcConfig.ipv4})`, type: "success" }
+                ];
+              } else {
+                output = [{ text: "Usage: show [int | dhcp]", type: "error" }];
+              }
+              break;
+            case "exit":
+              setMode("PC");
+              output = [{ text: "Connection closed. Returning to PC.", type: "info" }];
+              break;
+            default:
+              output = [{ text: `Invalid command. Type 'help' for options.`, type: "error" }];
+          }
+        }
+
+        setHistory([...currentHistory, ...output]);
+      };
+
+      return (
+        <div className="flex flex-col md:flex-row h-screen bg-slate-100 text-slate-800 font-sans">
           
-          <div className="space-y-5 text-sm text-slate-700">
-            <section>
-              <h4 className="font-bold text-blue-600 text-base">Network Interface Card (NIC) & MAC</h4>
-              <p className="mt-1 leading-relaxed">
-                A NIC allows a device to connect to a network. It contains the <strong>Media Access Control (MAC) address</strong> generated at manufacturing.
-                Format: <code>NN-NN-NN-DD-DD-DD</code> (First half is the manufacturer code, second half is the unique device serial).
-              </p>
-            </section>
-
-            <section>
-              <h4 className="font-bold text-blue-600 text-base">IP Addresses (IPv4 vs IPv6)</h4>
-              <p className="mt-1 leading-relaxed">
-                An IP gives a unique location address to devices. <strong>IPv4</strong> uses 32 bits (e.g., 109.108.158.1). <strong>IPv6</strong> was introduced to allow more devices, using 128-bit hex chunks (e.g., a8fb:7a88:fff0...). 
-                IPs can be <em>Static</em> (permanent) or <em>Dynamic</em> (assigned temporarily by a DHCP server).
-              </p>
-            </section>
-
-            <section>
-              <h4 className="font-bold text-blue-600 text-base">Routers</h4>
-              <p className="mt-1 leading-relaxed">
-                Routers enable data packets to be routed between different networks (e.g., joining a LAN to a WAN/Internet). It inspects packets and uses IP addresses to send data to the correct location.
-              </p>
-            </section>
-
-            <section>
-              <h4 className="font-bold text-blue-600 text-base">Domain Name Server (DNS)</h4>
-              <p className="mt-1 leading-relaxed">
-                DNS contains a database of URLs with matching IP addresses. URLs eliminate the need for a user to memorise IPs.
-                Example: Translating <code>www.scis-bo.com</code> to <code>200.105.215.10</code> or <code>www.google.com</code> to <code>142.250.190.46</code>.
-              </p>
-            </section>
-          </div>
-        </div>
-      </div>
-
-      {}
-      {/* RIGHT PANEL: Terminal Simulator */}
-      <div className="w-full md:w-2/3 bg-slate-900 h-full flex flex-col font-mono text-sm relative">
-        {/* Terminal Header */}
-        <div className="bg-slate-800 px-4 py-2 flex items-center justify-between border-b border-slate-700 shadow-md">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500"></div>
-            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-            <div className="w-3 h-3 rounded-full bg-green-500"></div>
-          </div>
-          <div className="text-slate-400 text-xs tracking-widest font-semibold uppercase">
-            {mode === "PC" ? "Command Prompt - PC" : "Terminal - Network Router"}
-          </div>
-          <div className="w-12"></div> {/* Spacer for balance */}
-        </div>
-
-        {/* Terminal Output Area */}
-        <div className="flex-grow p-4 overflow-y-auto text-green-400 space-y-1">
-          {history.map((line, index) => (
-            <div key={index} className={`leading-relaxed break-words ${getColorClass(line.type)}`}>
-              {line.text}
+          {/* LEFT PANEL: Educational Content & Objectives */}
+          <div className="w-full md:w-1/3 bg-white border-r border-slate-300 flex flex-col h-full overflow-y-auto shadow-lg z-10">
+            <div className="p-6 bg-blue-600 text-white shadow-md">
+              <h1 className="text-2xl font-bold tracking-tight">ICT CS O Level</h1>
+              <h2 className="text-sm font-medium text-blue-200 mt-1 uppercase tracking-wider">Unit 3.4 Network Hardware</h2>
             </div>
-          ))}
-          <div ref={terminalEndRef} />
+
+            <div className="p-6 flex-grow">
+              <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                 <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9.5a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path></svg>
+                 Your Mission Objectives
+              </h3>
+              {}
+              <div className="bg-slate-50 rounded-lg p-4 mb-6 border border-slate-200 shadow-inner">
+                <ul className="space-y-3">
+                  <ObjectiveItem done={objectives.ipconfig} text="Check your PC's IP and MAC using ipconfig" />
+                  <ObjectiveItem done={objectives.ping} text="Ping a website to check connectivity" />
+                  <ObjectiveItem done={objectives.nslookup} text="Use nslookup to find a website's IP address (e.g., www.scis-bo.com)" />
+                  <ObjectiveItem done={objectives.router} text="Connect to the router (connect router)" />
+                </ul>
+              </div>
+
+              <h3 className="text-xl font-bold text-slate-800 mb-4 border-b pb-2">Reference Guide</h3>
+              
+              <div className="space-y-5 text-sm text-slate-700">
+                <section>
+                  <h4 className="font-bold text-blue-600 text-base">Network Interface Card (NIC) & MAC</h4>
+                  <p className="mt-1 leading-relaxed">
+                    A NIC allows a device to connect to a network. It contains the <strong>Media Access Control (MAC) address</strong> generated at manufacturing.
+                    Format: <code>NN-NN-NN-DD-DD-DD</code> (First half is the manufacturer code, second half is the unique device serial).
+                  </p>
+                </section>
+
+                <section>
+                  <h4 className="font-bold text-blue-600 text-base">IP Addresses (IPv4 vs IPv6)</h4>
+                  <p className="mt-1 leading-relaxed">
+                    An IP gives a unique location address to devices. <strong>IPv4</strong> uses 32 bits (e.g., 109.108.158.1). <strong>IPv6</strong> was introduced to allow more devices, using 128-bit hex chunks (e.g., a8fb:7a88:fff0...). 
+                    IPs can be <em>Static</em> (permanent) or <em>Dynamic</em> (assigned temporarily by a DHCP server).
+                  </p>
+                </section>
+
+                <section>
+                  <h4 className="font-bold text-blue-600 text-base">Routers</h4>
+                  <p className="mt-1 leading-relaxed">
+                    Routers enable data packets to be routed between different networks (e.g., joining a LAN to a WAN/Internet). It inspects packets and uses IP addresses to send data to the correct location.
+                  </p>
+                </section>
+
+                <section>
+                  <h4 className="font-bold text-blue-600 text-base">Domain Name Server (DNS)</h4>
+                  <p className="mt-1 leading-relaxed">
+                    DNS contains a database of URLs with matching IP addresses. URLs eliminate the need for a user to memorise IPs.
+                    Example: Translating <code>www.scis-bo.com</code> to <code>200.105.215.10</code> or <code>www.google.com</code> to <code>142.250.190.46</code>.
+                  </p>
+                </section>
+              </div>
+            </div>
+          </div>
+
+          {}
+          {/* RIGHT PANEL: Terminal Simulator */}
+          <div className="w-full md:w-2/3 bg-slate-900 h-full flex flex-col font-mono text-sm relative">
+            {/* Terminal Header */}
+            <div className="bg-slate-800 px-4 py-2 flex items-center justify-between border-b border-slate-700 shadow-md">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+              </div>
+              <div className="text-slate-400 text-xs tracking-widest font-semibold uppercase">
+                {mode === "PC" ? "Command Prompt - PC" : "Terminal - Network Router"}
+              </div>
+              <div className="w-12"></div> {/* Spacer for balance */}
+            </div>
+
+            {/* Terminal Output Area */}
+            <div className="flex-grow p-4 overflow-y-auto text-green-400 space-y-1">
+              {history.map((line, index) => (
+                <div key={index} className={`leading-relaxed break-words ${getColorClass(line.type)}`}>
+                  {line.text}
+                </div>
+              ))}
+              <div ref={terminalEndRef} />
+            </div>
+
+            {/* Terminal Input Area */}
+            <div className="p-4 bg-slate-900 border-t border-slate-800 flex items-center">
+              <span className="text-slate-300 mr-2 font-bold select-none">
+                {mode === "PC" ? "C:\\PC>" : "Router#"}
+              </span>
+              <form onSubmit={handleCommandSubmit} className="flex-grow">
+                <input
+                  type="text"
+                  value={inputCommand}
+                  onChange={(e) => setInputCommand(e.target.value)}
+                  className="w-full bg-transparent outline-none text-green-400 caret-slate-200"
+                  autoFocus
+                  autoComplete="off"
+                  spellCheck="false"
+                />
+              </form>
+            </div>
+          </div>
         </div>
+      );
+    };
 
-        {/* Terminal Input Area */}
-        <div className="p-4 bg-slate-900 border-t border-slate-800 flex items-center">
-          <span className="text-slate-300 mr-2 font-bold select-none">
-            {mode === "PC" ? "C:\\PC>" : "Router#"}
-          </span>
-          <form onSubmit={handleCommandSubmit} className="flex-grow">
-            <input
-              type="text"
-              value={inputCommand}
-              onChange={(e) => setInputCommand(e.target.value)}
-              className="w-full bg-transparent outline-none text-green-400 caret-slate-200"
-              autoFocus
-              autoComplete="off"
-              spellCheck="false"
-            />
-          </form>
+    // Helper to colorize terminal output based on message type
+    const getColorClass = (type) => {
+      switch (type) {
+        case 'error': return 'text-red-400';
+        case 'success': return 'text-cyan-300';
+        case 'info': return 'text-yellow-300';
+        case 'input': return 'text-slate-200 font-bold mt-2';
+        default: return 'text-green-400';
+      }
+    };
+
+    // Component for rendering checkbox objectives
+    const ObjectiveItem = ({ done, text }) => (
+      <li className="flex items-start gap-3">
+        <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center border-2 flex-shrink-0 transition-colors duration-300 ${done ? 'bg-green-500 border-green-500' : 'bg-white border-slate-300'}`}>
+          {done && (
+            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+            </svg>
+          )}
         </div>
-      </div>
-    </div>
-  );
-};
+        <span className={`text-sm ${done ? 'text-slate-400 line-through' : 'text-slate-700 font-medium'}`}>
+          {text}
+        </span>
+      </li>
+    );
 
-// Helper to colorize terminal output based on message type
-const getColorClass = (type) => {
-  switch (type) {
-    case 'error': return 'text-red-400';
-    case 'success': return 'text-cyan-300';
-    case 'info': return 'text-yellow-300';
-    case 'input': return 'text-slate-200 font-bold mt-2';
-    default: return 'text-green-400';
-  }
-};
-
-// Component for rendering checkbox objectives
-const ObjectiveItem = ({ done, text }) => (
-  <li className="flex items-start gap-3">
-    <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center border-2 flex-shrink-0 transition-colors duration-300 ${done ? 'bg-green-500 border-green-500' : 'bg-white border-slate-300'}`}>
-      {done && (
-        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
-        </svg>
-      )}
-    </div>
-    <span className={`text-sm ${done ? 'text-slate-400 line-through' : 'text-slate-700 font-medium'}`}>
-      {text}
-    </span>
-  </li>
-);
-
-export default NetworkSimulator;
+    // Render the React application to the DOM
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<NetworkSimulator />);
+  </script>
+</body>
+</html>
